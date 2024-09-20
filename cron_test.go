@@ -678,6 +678,36 @@ func TestMultiThreadedStartAndStop(t *testing.T) {
 	cron.Stop()
 }
 
+func TestTrigger(t *testing.T) {
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
+	cron := newWithSeconds()
+	jobID, err := cron.AddJob("0 0 0 30 Feb ?", testJob{wg, "job0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cron.Start()
+	defer cron.Stop()
+
+	if cron.Entry(jobID).Next.Year() != 1 {
+		t.Fatal("expected job0 to be scheduled in 0001 year")
+	}
+
+	cron.Trigger(jobID)
+
+	if time.Until(cron.Entry(jobID).Next) > time.Second {
+		t.Fatal("expected job0 to be scheduled less than 1 second")
+	}
+
+	select {
+	case <-time.After(OneSecond):
+		t.FailNow()
+	case <-wait(wg):
+	}
+}
+
 func wait(wg *sync.WaitGroup) chan bool {
 	ch := make(chan bool)
 	go func() {
